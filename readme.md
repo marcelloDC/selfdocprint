@@ -26,7 +26,7 @@ x = 7
 print(formula, theta, x, x*theta, layout=InlineLayout())
 ```
 
-![image 1](./images/output_image_1.png)
+![image_1](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_1.png)
 
 The default value for the `layout=` keyword argument (normally `None`) can be configured so that subsequent calls require even less typing. In this case it would be good practice to not call the function 'print' to avoid confusion with the expected behaviour of python's built-in `print()`.
 
@@ -37,7 +37,7 @@ prinline = PrintFunc(default_layout=InlineLayout())
 prinline(formula, theta, x, x*theta)
 ```
 
-![image 2](./images/output_image_2.png)
+![image_2](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_2.png)
 
 A layout can be customised by overriding one or more of its fields (The fields are described in detail in the section: 'Style, format and layout specification'). Note that in the example below we override `head=` to suppress the empty line that is normally printed in front of the output when using the InlineLayout.
 
@@ -47,7 +47,7 @@ for i in range(0, 99, 21):
     print(i, i * theta, layout=InlineLayout(float_format="12.6f", pointer=" -> ", head=""))
 ```
 
-![image 3](./images/output_image_3.png)
+![image_3](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_3.png)
 
 Custom layouts can be created and referenced in subsequent calls. Note that in the example below we change the `style=` for the labels, which is specified as [ANSI Select Graphic Rendition](https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters) parameters.
 
@@ -58,7 +58,7 @@ my_layout = InlineLayout(style="92;3", int_format="4")
 print(x, x * theta, layout=my_layout)
 ```
 
-![image 4](./images/output_image_4.png)
+![image_4](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_4.png)
 
 ## Built-in layouts
 Next to the *'inline'* layout three additional layouts are available. The example below demonstrates the *'dict'* layout. In addition it shows the use of the `beg=` keyword argument which can be used to provide a heading to the output.
@@ -70,7 +70,7 @@ from selfdocprint import DictLayout
 print(formula, theta, x, x*theta, layout=DictLayout(), beg="Using the 'dict' layout:\n")
 ```
 
-![image 5](./images/output_image_5.png)
+![image_5](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_5.png)
 
 For values that take up a lot of horizontal space the *'scroll'* layout is particularly useful.
 
@@ -84,7 +84,7 @@ X = np.random.rand(5,5)
 print(X, X.T @ X, layout=ScrollLayout(), beg="Using the 'scroll' layout:\n")
 ```
 
-![image 6](./images/output_image_6.png)
+![image_6](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_6.png)
 
 Use the *'minimal'* layout if you only want to print labels in front of the values.
 
@@ -95,7 +95,7 @@ from selfdocprint import MinimalLayout
 print(formula, theta, x, theta*x, layout=MinimalLayout(), beg="Using the 'minimal' layout:\n\n")
 ```
 
-![image 7](./images/output_image_7.png)
+![image_7](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_7.png)
 
 ## Style, format and layout specification
 The `selfdocprint.print_layout_specs()` function prints the specification for every built-in layout and a rudimentary description of the layout algorithm.
@@ -107,7 +107,7 @@ import selfdocprint as sdp
 sdp.print_layout_specs()
 ```
 
-![image 8](./images/output_image_8.png)
+![image_8](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_8.png)
 
 All parameters are of type str. The format parameters are specified according to python's [Format Specification Mini-Language](https://docs.python.org/3/library/string.html#formatspec). If an alignment character (<, >, or ^) is specified without a fixed width in the lbl_format, then the alignment will be made relative to all other <labels\>. For the str_format a missing width value will result in an alignment of all lines in the string representation of a value. The algorithm injects the width of the longest string of the <label\> strings and the width of the longest line in a <value\> string into lbl_format and str_format respectively.
 

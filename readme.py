@@ -30,7 +30,7 @@ def add_image_references():
                 )  # read the empty line after triple backtick code block closing
                 image_count += 1
                 f.write(
-                    f"![image {image_count}](./images/output_image_{image_count}.png)\n\n"
+                    f"![image_{image_count}](https://raw.githubusercontent.com/marcelloDC/selfdocprint/main/images/output_image_{image_count}.png)\n\n"
                 )
 
 
