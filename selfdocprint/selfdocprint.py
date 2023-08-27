@@ -110,7 +110,7 @@ def print_layout_specs():
             comment = "# printed inbetween the styled and formatted label/value pairs"
         elif fld == "style":
             label = f"    {sgr(sty)}{fld}{sgr()}(<label> +      "
-            comment = "# style applied to the concatenation of <label> and ptr"
+            comment = "# style applied to the concatenation of <label> and pointer"
         elif fld == "pointer":
             label = f"    {sgr(sty)}{fld}{sgr()}) + <value>   "
             comment = "# printed in between the <label> and its associated <value>"
