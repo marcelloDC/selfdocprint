@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "selfdocprint"
-version = "0.1.4"
+version = "0.1.5"
 description = "A self-documenting, auto-layout print() function."
 license = "GPL-3.0-only"
 authors = ["Marcel de Croock <marcel.decroock@gmail.com>"]
@@ -10,7 +10,7 @@ keywords = ["print", "pretty", "self-documenting", "layout", "format"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
