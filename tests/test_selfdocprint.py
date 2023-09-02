@@ -134,6 +134,18 @@ class TestEdgeCases:
         assert capsys.readouterr().out == "test-99\n"
 
 
+class TestConfiguringDefaultLayout:
+    def test_configure_to_inline(self, capsys):
+        prinline = PrintFunc(default_layout=InlineLayout)
+        prinline(i)
+        assert capsys.readouterr().out == layouts_expected_output["inline"]["integer"]
+
+    def test_configured_to_inline_and_reset_to_none_in_call(self, capsys):
+        prinline = PrintFunc(default_layout=InlineLayout)
+        prinline(i, f, layout=None)
+        assert capsys.readouterr().out == "-99 99.555555\n"
+
+
 class TestPrintSpec:
     def test_print_specs_does_not_crash(self, capsys):
         sdp.print_layout_specs()

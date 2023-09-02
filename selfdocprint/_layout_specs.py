@@ -20,6 +20,11 @@ class Layout:
 
 
 @dataclass
+class DefaultLayout(Layout):
+    """Only used in the function declaration to indicate that by default
+    the `layout` kwarg is set to self.default_layout."""
+
+@dataclass
 class MinimalLayout(Layout):
     """Prints a label in front of each value."""
 

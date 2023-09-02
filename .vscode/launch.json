@@ -7,13 +7,6 @@
 
         
         {
-            "name": "Python: try.py",
-            "type": "python",
-            "request": "launch",
-            "module": "selfdocprint.try",
-            "justMyCode": true
-        },
-        {
             "name": "Python: examples.py",
             "type": "python",
             "request": "launch",

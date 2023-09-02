@@ -6,6 +6,7 @@ from typing import Any
 from selfdocprint._layout_specs import (
     DEFAULT_STYLE,
     Layout,
+    DefaultLayout,
     MinimalLayout,
     InlineLayout,
     DictLayout,
@@ -27,7 +28,7 @@ class PrintFunc:
     def __call__(
         self,
         *values,
-        layout: Layout = None,
+        layout: Layout = DefaultLayout,
         beg: str = "",
         end: str = "\n",
         sep: str = " ",
@@ -48,7 +49,7 @@ class PrintFunc:
             file (_type_, optional): a file-like object (stream). Defaults to None.
             flush (bool, optional): whether to forcibly flush the stream. Defaults to False.
         """
-        if layout is None:
+        if layout == DefaultLayout:
             layout = self.default_layout
 
         if layout is None:  # do normal built-in print()
