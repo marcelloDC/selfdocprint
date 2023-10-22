@@ -136,11 +136,7 @@ class TestEdgeCases:
 
 
 class TestContextWarning:
-    def test_context_warning(self, capsys):
-        eval("print(i, layout=MinimalLayout)")
-        assert capsys.readouterr().out == f"{_context_warning}\n-99\n"
-
-    def test_context_warning_displayed_only_once(self, capsys):
+    def test_context_warning_and_that_it_is_displayed_only_once(self, capsys):
         eval("print(i, layout=MinimalLayout)")
         eval("print(i, layout=MinimalLayout)")
         assert capsys.readouterr().out == f"{_context_warning}\n-99\n-99\n"
