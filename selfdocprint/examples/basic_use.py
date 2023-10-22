@@ -68,11 +68,15 @@ def demo():
         layout=MinimalLayout(),
         end="\n\n\n",
     )
+    eval("print(x, layout=ScrollLayout)")
+    eval("print(x, layout=ScrollLayout)")
 
 
 def with_config():
     print = PrintFunc(default_layout=MinimalLayout())
     print(formula, theta, x, theta * x)
+
+
 
 
 def print_specs():

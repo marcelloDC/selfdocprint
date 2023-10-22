@@ -16,6 +16,9 @@ import selfdocprint._printer as printer
 from selfdocprint._printer import sgr
 
 
+_context_warning = f"{sgr('38:5:160')}Warning: selfdocprint not supported in this context.{sgr()}"
+
+
 class PrintFunc:
     def __init__(self, default_layout: Layout = None):
         """Adds 'self-documenting' functionality to the built in print function.
@@ -24,6 +27,7 @@ class PrintFunc:
             default_layout (Layout, optional): Sets the default_layout used by __call__(). Defaults to None.
         """
         self.default_layout = default_layout
+        self.show_context_warning = True
 
     def __call__(
         self,
@@ -56,7 +60,16 @@ class PrintFunc:
             print(*values, end=end, sep=sep, file=file, flush=flush)
             return
 
-        call, _ = _get_call_info()
+        try:
+            call, _ = _get_call_info()
+        except:
+            # no source code available => do normal built-in print()
+            if self.show_context_warning:
+                print(_context_warning)
+                self.show_context_warning = False
+            print(*values, end=end, sep=sep, file=file, flush=flush)
+            return
+
         arg_exprs = _getargument_expressions(call)
 
         if len(values) == 1 and _is_literal(

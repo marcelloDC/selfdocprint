@@ -18,6 +18,7 @@ from tests.global_test_values import (
 import selfdocprint as sdp
 from selfdocprint import PrintFunc
 from selfdocprint import InlineLayout, DictLayout, ScrollLayout, MinimalLayout
+from selfdocprint.selfdocprint import _context_warning
 
 print = PrintFunc()
 
@@ -132,6 +133,17 @@ class TestEdgeCases:
     def test_single_value_fstring_literal_prints_without_label(self, capsys):
         print(f"test{i}", layout=MinimalLayout())
         assert capsys.readouterr().out == "test-99\n"
+
+
+class TestContextWarning:
+    def test_context_warning(self, capsys):
+        eval("print(i, layout=MinimalLayout)")
+        assert capsys.readouterr().out == f"{_context_warning}\n-99\n"
+
+    def test_context_warning_displayed_only_once(self, capsys):
+        eval("print(i, layout=MinimalLayout)")
+        eval("print(i, layout=MinimalLayout)")
+        assert capsys.readouterr().out == f"{_context_warning}\n-99\n-99\n"
 
 
 class TestConfiguringDefaultLayout:
