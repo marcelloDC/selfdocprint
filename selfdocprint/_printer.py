@@ -1,109 +1,173 @@
 import ast
 import io
 import re
+import sys
 from contextlib import closing
 from typing import Callable
+
 from ._layout_specs import Layout
 
 
 class _Pane:
     """Holds a formatted and layed-out label/value pair."""
 
-    def __init__(self, layout: Layout, label: str, value: object, max_lbl_width: int):
-        """Formats and lays out the label and its value."""
-        self.layout = layout
-        lbl_format = _fixate_alignment_width(layout.lbl_format, max_lbl_width)
-        label = f"{sgr(layout.style)}{format(label, lbl_format)}{layout.pointer}{sgr()}"
-        col_ofs = self._update_col_offset(_strip_styles(label))
-        if isinstance(value, bool):
-            val_str = format(str(value), layout.str_format)
+    def __init__(self, layout: Layout, label: str, value: object, max_label_width: int, include_label: bool = True
+):
+        # format the value
+        if value is None:
+            value_lines = [""]
+            value_width = 0
+        elif isinstance(value, bool):
+            value_lines = [str(value)]
+            value_width = len(value_lines[0])
         elif isinstance(value, int):
-            val_str = format(value, layout.int_format)
+            value_lines = [format(value, layout.int_format)]
+            value_width = len(value_lines[0])
         elif isinstance(value, float):
-            val_str = format(value, layout.float_format)
+            value_lines = [format(value, layout.float_format)]
+            value_width = len(value_lines[0])
         else:
             value_lines = str(value).split("\n")
-            max_value_line_len = max(len(vl) for vl in value_lines)
-            value_format = _fixate_alignment_width(
-                layout.str_format, max_value_line_len
-            )
-            value_lines = [format(l, value_format) for l in value_lines]
-            if _has_alignment(layout):
-                val_str = ("\n" + " " * col_ofs).join(value_lines)
+            value_width = max(len(vl) for vl in value_lines)
+            # if not fixed the the width of the string value format spec can only be value_width
+            format_spec = layout.str_format.replace("{value_width}", str(value_width))
+            value_lines = [format(v, format_spec) for v in value_lines]
+
+        if label is "":
+            label_line = ""
+        else:
+            # format the label and apend the pointer
+            ## if not fixed, the width in the label format spec can either be value_width or max_label_width
+            format_spec = layout.lbl_format.replace("{value_width}", str(value_width))
+            format_spec = format_spec.replace("{max_label_width}", str(max_label_width))
+            label_line = format(label, format_spec) + layout.pointer
+
+            last_new_line_ofs = label_line.rfind("\n")
+            if last_new_line_ofs == -1:
+                if _has_alignment(layout):
+                    # indent the value lines
+                    indent = " " * len(label_line)
+                    value_lines = [s if i == 0 else indent + s for i, s in enumerate(value_lines)]
+                label_line = f"{sgr(layout.style)}{label_line}{sgr()}"
             else:
-                val_str = ("\n").join(value_lines)
-        self.lines = (label + val_str).split("\n")
-        self.line_max_len = max(len(_strip_styles(l)) for l in self.lines)
-        self.line_count: int = len(self.lines)
+                # maybe TODO implement possible feature here: custom indents
+                max_label_line_width = max(len(l) for l in label_line.split("\n"))
+                if max_label_line_width > value_width:
+                    indent = " " * (max_label_line_width - value_width)
+                    value_lines = [indent + l for l in value_lines]
+                label_line = f"{sgr(layout.style)}{label_line[:last_new_line_ofs]}{sgr()}{label_line[last_new_line_ofs:]}"
+
+        self.layout = layout
+        if include_label:
+            self.lines: list(str) = (label_line + "\n".join(value_lines)).split("\n")
+        else:
+            self.lines: list(str) = value_lines
+        self.width: int = max(len(_strip_styles(l)) for l in self.lines)
+        self.height: int = len(self.lines)
+
 
     def __str__(self):
         return "\n".join(self.lines)
 
     def get_line(self, i: int):
-        if i < self.line_count:
+        if i < self.height:
             return self.lines[i]
         else:
             if _has_alignment(self.layout):
-                return " " * self.line_max_len
+                return " " * self.width
             else:
                 return ""
 
-    def _update_col_offset(self, s: str, start_col_ofs: int = 0) -> int:
-        """Calculates the new column offset if s were printed starting at start_col_ofs."""
-        l = len(s)
-        if (col_ofs := s.rfind("\n")) > -1:
-            return l - col_ofs - 1
-        else:
-            return start_col_ofs + l
 
-
-def press(args: list[ast.expr], values: list[object], layout: Layout) -> str:
+def press(
+    args: list[ast.expr],
+    values: list[object],
+    layout: Layout,
+    press_labels: bool = True
+) -> str:
     labels = [_create_label(arg, layout.literal_lbl) for arg in args]
     max_lbl_width: int = _getlongest_line_len(labels)
-    panes = [
-        _Pane(layout, lbl, val, max_lbl_width) for (lbl, val) in zip(labels, values)
-    ]
+    beg, pre, post, end = _get_edges(layout.head, layout.tail)
+
     with closing(io.StringIO("")) as buf:
-        if _isleft_to_right_layout(layout) and _has_alignment(layout):
-            max_lines = max([pane.line_count for pane in panes])
-            beg, pre, post, end = _get_edges(layout.head, layout.tail)
+        if press_labels:
             buf.write(beg)
-            for l in range(max_lines):
-                buf.write(pre)
-                buf.write(layout.seperator.join(pane.get_line(l) for pane in panes))
-                buf.write(post)
-                if l < max_lines - 1:
+        # if _isleft_to_right_layout(layout) and _has_alignment(layout):
+        current_width = 0
+        panes = []
+        for lbl, val in zip(labels, values, strict=True):
+            pane = _Pane(layout, lbl, val, max_lbl_width, press_labels)
+            if (layout.max_width is not None and pane.width > layout.max_width) or (
+                layout.max_height is not None and pane.height > layout.max_height
+            ):
+                # the pane is too high or too wide
+                if len(panes) > 0:
+                    _write_panes_to_buf(panes, buf, layout.alt_layout)
                     buf.write("\n")
-            # buf.write(end)
-        else:
-            buf.write(layout.head)
-            buf.write(layout.seperator.join(str(pane) for pane in panes))
-            buf.write(layout.tail)
+                    current_width = 0
+                    panes = []
+            elif (
+                layout.max_width is not None
+                and current_width + pane.width > layout.max_width
+            ):
+                # with the new pane the horizontal pane sequence would become too long
+                _write_panes_to_buf(panes, buf, layout, pre, post)
+                buf.write("\n")
+                current_width = pane.width
+                panes = [pane]
+            else:
+                current_width += pane.width
+                panes.append(pane)
+        _write_panes_to_buf(panes, buf, layout, pre, post)
+        # else:
+        #     panes = [
+        #         _Pane(layout, lbl, val, max_lbl_width)
+        #         for (lbl, val) in zip(labels, values)
+        #     ]
+        #     _write_panes_to_buf(panes, buf, layout)
+        buf.write(end)
         return buf.getvalue()
 
 
-def format_objects(
-    objects: list[any], int_format, float_format, str_format
-) -> (list[list[str]], int):
-    result_list = []
-    max_width = 0
-    for value in objects:
-        if isinstance(value, bool):
-            result_list.append(list(format(str(value), str_format)))
-        elif isinstance(value, int):
-            result_list.append(list(format(str(value), int_format)))
-        elif isinstance(value, float):
-            result_list.append(list(format(str(value), float_format)))
-        else:
-            value_lines = str(value).split("\n")
-            max_value_line_len = max(len(vl) for vl in value_lines)
-            value_format = _fixate_alignment_width(str_format, max_value_line_len)
-            value_lines = [format(l, value_format) for l in value_lines]
-            # if _has_alignment(layout):
-            #     val_str = ("\n" + " " * col_ofs).join(value_lines)
-            # else:
-            #     val_str = ("\n").join(value_lines)
-    return (result_list, max_width)
+def _write_panes_to_buf(panes, buf, layout, pre="", post=""):
+    if len(panes) == 0:
+        return
+
+    # beg, pre, post, end = _get_edges(layout.head, layout.tail)
+    if _isleft_to_right_layout(layout) and _has_alignment(layout):
+        max_lines = max([pane.height for pane in panes])
+        for l in range(max_lines):
+            buf.write(pre)
+            buf.write(layout.seperator.join(pane.get_line(l) for pane in panes))
+            buf.write(post)
+            if l < max_lines - 1:
+                buf.write("\n")
+    else:
+        buf.write(layout.seperator.join(str(pane) for pane in panes))
+
+
+# def format_objects(
+#     objects: list[any], int_format, float_format, str_format
+# ) -> (list[list[str]], int):
+#     result_list = []
+#     max_width = 0
+#     for value in objects:
+#         if isinstance(value, bool):
+#             result_list.append(list(format(str(value), str_format)))
+#         elif isinstance(value, int):
+#             result_list.append(list(format(str(value), int_format)))
+#         elif isinstance(value, float):
+#             result_list.append(list(format(str(value), float_format)))
+#         else:
+#             value_lines = str(value).split("\n")
+#             max_value_line_len = max(len(vl) for vl in value_lines)
+#             value_format = _fixate_alignment_width(str_format, max_value_line_len)
+#             value_lines = [format(l, value_format) for l in value_lines]
+#             # if _has_alignment(layout):
+#             #     val_str = ("\n" + " " * col_ofs).join(value_lines)
+#             # else:
+#             #     val_str = ("\n").join(value_lines)
+#     return (result_list, max_width)
 
 
 def iswithin_max_width(page: str, max_width) -> bool:
@@ -124,8 +188,8 @@ def _has_alignment(layout: Layout):
 
 
 def _isleft_to_right_layout(layout: Layout) -> bool:
-    for attr in {"seperator", "pointer"}:
-        # for attr in {"sep"}: # for next version with flexible tables
+    # for attr in ["seperator", "pointer"]:
+    for attr in ["seperator"]:  # for next version with flexible tables
         if "\n" in getattr(layout, attr):
             return False
     return True
@@ -137,29 +201,36 @@ def _get_edges(beg: str, end: str):
         beg = beg[: last_nl + 1]
     else:
         pre = beg
+        beg = ""
 
     if (first_nl := end.find("\n")) != -1:
-        post = end[: first_nl + 1]
-        end = end[first_nl + 1 :]
+        post = end[:first_nl]
+        end = end[first_nl:]
     else:
         post = end
+        end = ""
 
     return beg, pre, post, end
 
 
-def _fixate_alignment_width(format_spec: str, fixed_width: int):
-    """Checks for an 'align' char in format_spec and appends fixed_width if the
-    width for the alignment is not specified"""
+# def _OLD_fixate_alignment_width(format_spec: str, fixed_width: int):
+#     """Checks for an 'align' char in format_spec and appends fixed_width if the
+#     width for the alignment is not specified"""
 
-    # The following pattern captures an align specification without a width: an align character,
-    # followed by zero or more '0' chars (specified inside an Atomic group), but not followed by a digit.
-    pattern = r"([<>^](?>0*))(?![1-9])"
-    return re.sub(
-        pattern,
-        r"\g<1>" + str(fixed_width),
-        format_spec,
-        count=1,
-    )
+#     # The following pattern captures an align specification without a width: an align character,
+#     # followed by zero or more '0' chars (specified inside an Atomic group), but not followed by a digit.
+#     pattern = r"([<>^](?>0*))(?![1-9])"
+#     return re.sub(
+#         pattern,
+#         r"\g<1>" + str(fixed_width),
+#         format_spec,
+#         count=1,
+#     )
+
+# def _fixate_alignment_width(label_format:str, value_width:int, max_label_width:int):
+#     lf = label_format.replace("{value_width}", str(value_width))
+#     lf = label_format.replace("{max_label_width}", str(max_label_width))
+#     return lf
 
 
 def _getlongest_line_len(strs: list[str]) -> int:

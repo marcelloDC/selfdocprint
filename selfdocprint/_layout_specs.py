@@ -16,13 +16,17 @@ class Layout:
     style: str = DEFAULT_STYLE
     pointer: str = ""
     tail: str = ""
-    literal_lbl: str = "_"
+    literal_lbl: str = ""
+    alt_layout: "Layout" = None
+    max_width: int = None
+    max_height: int = None
 
 
 @dataclass
 class DefaultLayout(Layout):
     """Only used in the function declaration to indicate that by default
     the `layout` kwarg is set to self.default_layout."""
+
 
 @dataclass
 class MinimalLayout(Layout):
@@ -39,11 +43,9 @@ class InlineLayout(Layout):
     Label/value pairs are printed from left to right.
     Multi-line value strings are properly aligned."""
 
-    int_format: str = "-8"
-    float_format: str = "-12.3f"
-    str_format: str = "<"
+    str_format: str = "<{value_width}"
     head: str = "\n"
-    seperator: str = "   "
+    seperator: str = "  "
     pointer: str = ": "
     tail: str = ""
 
@@ -54,14 +56,15 @@ class DictLayout(Layout):
     Label/value pairs are printed from top to bottom.
     Multi-line value strings are properly aligned."""
 
-    lbl_format: str = "<"
+    lbl_format: str = "<{max_label_width}"
     int_format: str = "-8"
     float_format: str = "-12.3f"
-    str_format: str = "<"
+    str_format: str = "<{value_width}"
     head: str = "\n"
     seperator: str = "\n"
     pointer: str = " : "
     tail: str = ""
+    literal_lbl: str = "_"
 
 
 @dataclass
@@ -73,3 +76,35 @@ class ScrollLayout(Layout):
     seperator: str = "\n\n"
     pointer: str = ":\n"
     tail: str = "\n"
+
+
+@dataclass
+class AutoLayout(Layout):
+    """Uses InlineLayout with the following additions: 1) if the next label/value pair would exceed
+    max_width then a new row is started, 2) if a label/value pair exceeds max_height then it is printed
+    using alt_layout."""
+
+    str_format: str = "<{value_width}"
+    head: str = "\n"
+    seperator: str = "  "
+    pointer: str = ": "
+    alt_layout: Layout = ScrollLayout
+    max_width: int = 140
+    max_height: int = 10
+
+
+@dataclass
+class TableLayout(Layout):
+    """Prints a label above its value.
+    Label/value pairs are printed from left to right.
+    Multi-line value strings are properly aligned."""
+
+    head: str = "\n"
+    # tail: str = " |"
+    seperator: str = " | "
+    lbl_format: str = ">{value_width}"
+    int_format: str = "-8"
+    float_format: str = "-12.3f"
+    str_format: str = "<{value_width}"
+    pointer: str = "\n"
+    literal_lbl: str = "_"
