@@ -6,14 +6,14 @@ from typing import Any
 import selfdocprint._printer as printer
 from selfdocprint._layout_specs import (
     DEFAULT_STYLE,
-    Layout,
-    DefaultLayout,
-    InlineLayout,
-    ScrollLayout,
-    DictLayout,
-    MinimalLayout,
     AutoLayout,
-    TableLayout
+    DefaultLayout,
+    DictLayout,
+    InlineLayout,
+    Layout,
+    MinimalLayout,
+    ScrollLayout,
+    TableLayout,
 )
 from selfdocprint._printer import sgr
 
@@ -69,7 +69,7 @@ class PrintFunc:
             return
 
         if type(layout) == type:
-            layout = layout()   # create an instance if a class was given
+            layout = layout()  # create an instance if a class was given
 
         try:
             call, _, pos = _get_call_info()
@@ -83,22 +83,20 @@ class PrintFunc:
 
         arg_exprs = _getargument_expressions(call)
 
-        if len(values) == 1 and _is_literal(
-            arg_exprs[0]
-        ):  # print single literals normally
+        if all(_is_literal(arg_expr) for arg_expr in arg_exprs):
+            # print literals normally
             print(*values, end=end, sep=sep, file=file, flush=flush)
             return
 
         if isinstance(layout, TableLayout) and self._last_call_pos == pos:
-            page = printer.press(arg_exprs, values, layout, press_labels=False)
+            page = printer.press(arg_exprs, values, layout, beg, end, press_labels=False)
         else:
             self._last_call_pos = pos
-            page = printer.press(arg_exprs, values, layout)
+            page = printer.press(arg_exprs, values, layout, beg, end)
 
-
-        print(beg, sep="", end="", file=file)
+        # print(beg, sep="", end="", file=file)
         print(
-            page, sep="", end=end, file=file, flush=flush
+            page, sep="", end="", file=file, flush=flush
         )  #  sep is ignored when a layout is used
 
 

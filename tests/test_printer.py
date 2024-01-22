@@ -25,18 +25,18 @@ from tests.global_test_values import (
 class Test_press_with_all_layouts:
     # inline
     def test_press_of_inline_layout_integer(self, capsys):
-        assert _strip_styles(press([i_expr], [i], InlineLayout)) == "\ni: -99"
+        assert _strip_styles(press([i_expr], [i], InlineLayout, beg="", end="")) == "i: -99"
 
     def test_press_of_inline_layout_string(self, capsys):
         assert (
-            _strip_styles(press([s_expr], [s], InlineLayout))
-            == "\ns: tic    \n   tacable\n   toes   "
+            _strip_styles(press([s_expr], [s], InlineLayout, beg="", end=""))
+            == "s: tic    \n   tacable\n   toes   "
         )
 
     def test_press_of_inline_layout_integer_and_string(self, capsys):
         assert (
-            _strip_styles(press([i_expr, s_expr], [i, s], InlineLayout))
-            == "\ni: -99  s: tic    \n           tacable\n           toes   "
+            _strip_styles(press([i_expr, s_expr], [i, s], InlineLayout, beg="", end=""))
+            == "i: -99  s: tic    \n           tacable\n           toes   "
         )
 
 

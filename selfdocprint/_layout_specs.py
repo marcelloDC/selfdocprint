@@ -11,12 +11,12 @@ class Layout:
     int_format: str = ""
     float_format: str = ""
     str_format: str = ""
-    head: str = ""
-    seperator: str = ""
     style: str = DEFAULT_STYLE
     pointer: str = ""
-    tail: str = ""
     literal_lbl: str = ""
+    head: str = ""
+    tail: str = ""
+    seperator: str = ""
     alt_layout: "Layout" = None
     max_width: int = None
     max_height: int = None
@@ -34,7 +34,6 @@ class MinimalLayout(Layout):
 
     seperator: str = " "
     pointer: str = ":"
-    tail: str = ""
 
 
 @dataclass
@@ -44,10 +43,8 @@ class InlineLayout(Layout):
     Multi-line value strings are properly aligned."""
 
     str_format: str = "<{value_width}"
-    head: str = "\n"
     seperator: str = "  "
     pointer: str = ": "
-    tail: str = ""
 
 
 @dataclass
@@ -60,10 +57,8 @@ class DictLayout(Layout):
     int_format: str = "-8"
     float_format: str = "-12.3f"
     str_format: str = "<{value_width}"
-    head: str = "\n"
     seperator: str = "\n"
     pointer: str = " : "
-    tail: str = ""
     literal_lbl: str = "_"
 
 
@@ -72,10 +67,8 @@ class ScrollLayout(Layout):
     """Prints a label above its value.
     Label/value pairs are printed from top to bottom."""
 
-    head: str = "\n"
-    seperator: str = "\n\n"
+    seperator: str = "\n"
     pointer: str = ":\n"
-    tail: str = "\n"
 
 
 @dataclass
@@ -85,7 +78,6 @@ class AutoLayout(Layout):
     using alt_layout."""
 
     str_format: str = "<{value_width}"
-    head: str = "\n"
     seperator: str = "  "
     pointer: str = ": "
     alt_layout: Layout = ScrollLayout
@@ -99,7 +91,7 @@ class TableLayout(Layout):
     Label/value pairs are printed from left to right.
     Multi-line value strings are properly aligned."""
 
-    head: str = "\n"
+    # head: str = "\n"
     # tail: str = " |"
     seperator: str = " | "
     lbl_format: str = ">{value_width}"
