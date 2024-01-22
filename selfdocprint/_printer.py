@@ -1,7 +1,6 @@
 import ast
 import io
 import re
-import sys
 from contextlib import closing
 from typing import Callable
 
@@ -11,8 +10,14 @@ from ._layout_specs import Layout
 class _Pane:
     """Holds a formatted and layed-out label/value pair."""
 
-    def __init__(self, layout: Layout, label: str, value: object, max_label_width: int, include_label: bool = True
-):
+    def __init__(
+        self,
+        layout: Layout,
+        label: str,
+        value: object,
+        max_label_width: int,
+        include_label: bool = True,
+    ):
         # format the value
         if value is None:
             value_lines = [""]
@@ -33,7 +38,7 @@ class _Pane:
             format_spec = layout.str_format.replace("{value_width}", str(value_width))
             value_lines = [format(v, format_spec) for v in value_lines]
 
-        if label is "":
+        if label == "":
             label_line = ""
         else:
             # format the label and apend the pointer
@@ -47,12 +52,14 @@ class _Pane:
                 if _has_alignment(layout):
                     # indent the value lines
                     indent = " " * len(label_line)
-                    value_lines = [s if i == 0 else indent + s for i, s in enumerate(value_lines)]
+                    value_lines = [
+                        s if i == 0 else indent + s for i, s in enumerate(value_lines)
+                    ]
                 label_line = f"{sgr(layout.style)}{label_line}{sgr()}"
             else:
                 # maybe TODO implement possible feature here: custom indents
                 max_label_line_width = max(len(l) for l in label_line.split("\n"))
-                if max_label_line_width > value_width:
+                if _has_alignment(layout) and max_label_line_width > value_width:
                     indent = " " * (max_label_line_width - value_width)
                     value_lines = [indent + l for l in value_lines]
                 label_line = f"{sgr(layout.style)}{label_line[:last_new_line_ofs]}{sgr()}{label_line[last_new_line_ofs:]}"
@@ -64,7 +71,6 @@ class _Pane:
             self.lines: list(str) = value_lines
         self.width: int = max(len(_strip_styles(l)) for l in self.lines)
         self.height: int = len(self.lines)
-
 
     def __str__(self):
         return "\n".join(self.lines)
@@ -83,98 +89,66 @@ def press(
     args: list[ast.expr],
     values: list[object],
     layout: Layout,
-    press_labels: bool = True
+    beg: str,
+    end: str,
+    press_labels: bool = True,
 ) -> str:
     labels = [_create_label(arg, layout.literal_lbl) for arg in args]
     max_lbl_width: int = _getlongest_line_len(labels)
-    beg, pre, post, end = _get_edges(layout.head, layout.tail)
+    _beg, pre, post, _end = _get_edges(beg + layout.head, layout.tail + end)
 
     with closing(io.StringIO("")) as buf:
         if press_labels:
-            buf.write(beg)
-        # if _isleft_to_right_layout(layout) and _has_alignment(layout):
+            buf.write(_beg)
         current_width = 0
-        panes = []
-        for lbl, val in zip(labels, values, strict=True):
+        pane_row = []
+        for i, (lbl, val) in enumerate(zip(labels, values, strict=True)):
             pane = _Pane(layout, lbl, val, max_lbl_width, press_labels)
-            if (layout.max_width is not None and pane.width > layout.max_width) or (
-                layout.max_height is not None and pane.height > layout.max_height
-            ):
-                # the pane is too high or too wide
-                if len(panes) > 0:
-                    _write_panes_to_buf(panes, buf, layout.alt_layout)
-                    buf.write("\n")
+            if _isleft_to_right_layout(layout) and _has_alignment(layout):
+                if (layout.max_width is not None and pane.width > layout.max_width) or (
+                    layout.max_height is not None and pane.height > layout.max_height
+                ):
+                    # the pane is too high or too wide, it has to be placed in its own row
+                    if len(pane_row) > 0:
+                        pane_row = _flush_pane_row(pane_row, buf, layout, pre, post)
+                        buf.write("\n")
                     current_width = 0
-                    panes = []
-            elif (
-                layout.max_width is not None
-                and current_width + pane.width > layout.max_width
-            ):
-                # with the new pane the horizontal pane sequence would become too long
-                _write_panes_to_buf(panes, buf, layout, pre, post)
-                buf.write("\n")
-                current_width = pane.width
-                panes = [pane]
-            else:
-                current_width += pane.width
-                panes.append(pane)
-        _write_panes_to_buf(panes, buf, layout, pre, post)
-        # else:
-        #     panes = [
-        #         _Pane(layout, lbl, val, max_lbl_width)
-        #         for (lbl, val) in zip(labels, values)
-        #     ]
-        #     _write_panes_to_buf(panes, buf, layout)
-        buf.write(end)
+                    alt_layout = layout.alt_layout()
+                    alt_pane = _Pane(alt_layout, lbl, val, max_lbl_width, press_labels)
+                    pane_row = _flush_pane_row([alt_pane], buf, alt_layout, pre, post)
+                    buf.write("\n")
+                elif (
+                    layout.max_width is not None
+                    and current_width + pane.width > layout.max_width
+                ):
+                    # with the new pane the horizontal pane sequence would become too long
+                    pane_row = _flush_pane_row(pane_row, buf, layout, pre, post)
+                    buf.write("\n")
+                    current_width = pane.width
+                    pane_row.append(pane)
+                else:
+                    current_width += pane.width
+                    pane_row.append(pane)
+            else:  # not _isleft_to_right_layout(layout) and _has_alignment(layout)
+                if i > 0:
+                    buf.write(layout.seperator)
+                pane_row = _flush_pane_row([pane], buf, layout, pre, post)
+
+        _flush_pane_row(pane_row, buf, layout, pre, post)
+        buf.write(_end)
         return buf.getvalue()
 
 
-def _write_panes_to_buf(panes, buf, layout, pre="", post=""):
-    if len(panes) == 0:
-        return
-
-    # beg, pre, post, end = _get_edges(layout.head, layout.tail)
-    if _isleft_to_right_layout(layout) and _has_alignment(layout):
-        max_lines = max([pane.height for pane in panes])
+def _flush_pane_row(pane_row, buf, layout, pre="", post=""):
+    if len(pane_row) > 0:
+        max_lines = max([pane.height for pane in pane_row])
         for l in range(max_lines):
             buf.write(pre)
-            buf.write(layout.seperator.join(pane.get_line(l) for pane in panes))
+            buf.write(layout.seperator.join(pane.get_line(l) for pane in pane_row))
             buf.write(post)
             if l < max_lines - 1:
                 buf.write("\n")
-    else:
-        buf.write(layout.seperator.join(str(pane) for pane in panes))
-
-
-# def format_objects(
-#     objects: list[any], int_format, float_format, str_format
-# ) -> (list[list[str]], int):
-#     result_list = []
-#     max_width = 0
-#     for value in objects:
-#         if isinstance(value, bool):
-#             result_list.append(list(format(str(value), str_format)))
-#         elif isinstance(value, int):
-#             result_list.append(list(format(str(value), int_format)))
-#         elif isinstance(value, float):
-#             result_list.append(list(format(str(value), float_format)))
-#         else:
-#             value_lines = str(value).split("\n")
-#             max_value_line_len = max(len(vl) for vl in value_lines)
-#             value_format = _fixate_alignment_width(str_format, max_value_line_len)
-#             value_lines = [format(l, value_format) for l in value_lines]
-#             # if _has_alignment(layout):
-#             #     val_str = ("\n" + " " * col_ofs).join(value_lines)
-#             # else:
-#             #     val_str = ("\n").join(value_lines)
-#     return (result_list, max_width)
-
-
-def iswithin_max_width(page: str, max_width) -> bool:
-    page = _strip_styles(page)
-    if _getlongest_line_len([page]) < max_width:
-        return True
-    return False
+    return []
 
 
 def sgr(sgr_codes: str = None):
@@ -188,8 +162,7 @@ def _has_alignment(layout: Layout):
 
 
 def _isleft_to_right_layout(layout: Layout) -> bool:
-    # for attr in ["seperator", "pointer"]:
-    for attr in ["seperator"]:  # for next version with flexible tables
+    for attr in ["seperator"]:
         if "\n" in getattr(layout, attr):
             return False
     return True
@@ -226,11 +199,6 @@ def _get_edges(beg: str, end: str):
 #         format_spec,
 #         count=1,
 #     )
-
-# def _fixate_alignment_width(label_format:str, value_width:int, max_label_width:int):
-#     lf = label_format.replace("{value_width}", str(value_width))
-#     lf = label_format.replace("{max_label_width}", str(max_label_width))
-#     return lf
 
 
 def _getlongest_line_len(strs: list[str]) -> int:
@@ -294,4 +262,4 @@ def _create_label(arg: ast.expr, literal_str: str):
                 return action(arg)
             else:
                 raise ValueError(action)
-    return f"unknow arg encoutered: {arg}"
+    return f"unknow arg encountered: {arg}"

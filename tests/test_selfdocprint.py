@@ -12,6 +12,7 @@ from selfdocprint import (
 )
 from selfdocprint._printer import _strip_styles
 from selfdocprint.selfdocprint import _context_warning
+from selfdocprint.selfdocprint import _print as print
 from tests.global_test_values import (
     _dict,
     _list,
@@ -24,14 +25,28 @@ from tests.global_test_values import (
     i,
     layouts_expected_output,
     s,
+    s_12_lines,
     theta,
     x,
 )
 
-print = PrintFunc()
-
 
 class TestLayouts:
+    # auto
+    def test_auto_layout_new_row(self, capsys):
+        print(formula, theta, x, theta * x, 1/3, 1/6, 1/9)
+        assert (
+            _strip_styles(capsys.readouterr().out)
+            == layouts_expected_output["auto"]["row_too_long"]
+        )
+
+    def test_auto_layout_too_high_value(self, capsys):
+        print(formula, theta, x, theta * x, s_12_lines, 1/3, 1/6, 1/9)
+        assert (
+            _strip_styles(capsys.readouterr().out)
+            == layouts_expected_output["auto"]["value_too_high"]
+        )
+
     # inline
     def test_inline_layout_integer(self, capsys):
         print(i, layout=InlineLayout())
@@ -128,12 +143,19 @@ class TestLayouts:
             capsys.readouterr().out == layouts_expected_output["minimal"]["all_values"]
         )
 
-    # auto
-    def test_auto_layout_new_row(self, capsys):
-        print(formula, theta, x, theta * x, 1/3, 1/6, 1/9, layout=AutoLayout())
+    # table
+    def test_table_layout(self, capsys):
+        for i in range(5):
+            print(i, i**2, 1 / 0.01, i * 2, layout=sdp.TableLayout)
         assert (
-            _strip_styles(capsys.readouterr().out)
-            == layouts_expected_output["auto"]["new_row"]
+            _strip_styles(capsys.readouterr().out) == layouts_expected_output["table"]["normal"]
+        )
+
+    def test_table_layout_widened_columns(self, capsys):
+        for i in range(5):
+            print(i, i**2, 1 / (i + 0.000001), i * 2, layout=sdp.TableLayout)
+        assert (
+            _strip_styles(capsys.readouterr().out) == layouts_expected_output["table"]["widened_columns"]
         )
 
 
