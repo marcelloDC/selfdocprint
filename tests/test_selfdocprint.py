@@ -1,29 +1,52 @@
 import pytest
-from tests.global_test_values import (
-    bf,
-    bt,
-    i,
-    f,
-    s,
-    formula,
-    theta,
-    x,
-    _list,
-    _tuple,
-    _dict,
-    _set,
-    layouts_expected_output,
-)
 
 import selfdocprint as sdp
-from selfdocprint import PrintFunc
-from selfdocprint import InlineLayout, DictLayout, ScrollLayout, MinimalLayout
+from selfdocprint import (
+    AutoLayout,
+    DictLayout,
+    InlineLayout,
+    MinimalLayout,
+    PrintFunc,
+    ScrollLayout,
+    TableLayout,
+)
+from selfdocprint._printer import _strip_styles
 from selfdocprint.selfdocprint import _context_warning
-
-print = PrintFunc()
+from selfdocprint.selfdocprint import _print as print
+from tests.global_test_values import (
+    _dict,
+    _list,
+    _set,
+    _tuple,
+    bf,
+    bt,
+    f,
+    formula,
+    i,
+    layouts_expected_output,
+    s,
+    s_12_lines,
+    theta,
+    x,
+)
 
 
 class TestLayouts:
+    # auto
+    def test_auto_layout_new_row(self, capsys):
+        print(formula, theta, x, theta * x, 1/3, 1/6, 1/9)
+        assert (
+            _strip_styles(capsys.readouterr().out)
+            == layouts_expected_output["auto"]["row_too_long"]
+        )
+
+    def test_auto_layout_too_high_value(self, capsys):
+        print(formula, theta, x, theta * x, s_12_lines, 1/3, 1/6, 1/9)
+        assert (
+            _strip_styles(capsys.readouterr().out)
+            == layouts_expected_output["auto"]["value_too_high"]
+        )
+
     # inline
     def test_inline_layout_integer(self, capsys):
         print(i, layout=InlineLayout())
@@ -120,6 +143,21 @@ class TestLayouts:
             capsys.readouterr().out == layouts_expected_output["minimal"]["all_values"]
         )
 
+    # table
+    def test_table_layout(self, capsys):
+        for i in range(5):
+            print(i, i**2, 1 / 0.01, i * 2, layout=sdp.TableLayout)
+        assert (
+            _strip_styles(capsys.readouterr().out) == layouts_expected_output["table"]["normal"]
+        )
+
+    def test_table_layout_widened_columns(self, capsys):
+        for i in range(5):
+            print(i, i**2, 1 / (i + 0.000001), i * 2, layout=sdp.TableLayout)
+        assert (
+            _strip_styles(capsys.readouterr().out) == layouts_expected_output["table"]["widened_columns"]
+        )
+
 
 class TestEdgeCases:
     def test_single_value_str_literal_prints_without_label(self, capsys):
@@ -142,13 +180,13 @@ class TestContextWarning:
         assert capsys.readouterr().out == f"{_context_warning}\n-99\n-99\n"
 
 
-class TestConfiguringDefaultLayout:
-    def test_configure_to_inline(self, capsys):
+class TestCreateCustomPrintFunction:
+    def test_with_inline_as_default_layout(self, capsys):
         prinline = PrintFunc(default_layout=InlineLayout)
         prinline(i)
         assert capsys.readouterr().out == layouts_expected_output["inline"]["integer"]
 
-    def test_configured_to_inline_and_reset_to_none_in_call(self, capsys):
+    def test_override_layout_to_none_in_call(self, capsys):
         prinline = PrintFunc(default_layout=InlineLayout)
         prinline(i, f, layout=None)
         assert capsys.readouterr().out == "-99 99.555555\n"

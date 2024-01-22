@@ -3,31 +3,38 @@ import inspect
 from dataclasses import fields
 from typing import Any
 
+import selfdocprint._printer as printer
 from selfdocprint._layout_specs import (
     DEFAULT_STYLE,
-    Layout,
+    AutoLayout,
     DefaultLayout,
-    MinimalLayout,
-    InlineLayout,
     DictLayout,
+    InlineLayout,
+    Layout,
+    MinimalLayout,
     ScrollLayout,
+    TableLayout,
 )
-import selfdocprint._printer as printer
 from selfdocprint._printer import sgr
 
-
-_context_warning = f"{sgr('38:5:160')}Warning: selfdocprint not supported in this context.{sgr()}"
+_context_warning = f"{sgr('38:5:160')}Warning: selfdocprint not supported in this context. Using built-in print() instead.{sgr()}"
 
 
 class PrintFunc:
-    def __init__(self, default_layout: Layout = None):
+    def __init__(
+        self,
+        default_layout: Layout = None,
+    ):
         """Adds 'self-documenting' functionality to the built in print function.
 
         Args:
             default_layout (Layout, optional): Sets the default_layout used by __call__(). Defaults to None.
+            default_max_width (int, optional): Sets the maximum row length. Used by __call__ only in the "auto" layout. Defaults to None.
+            default_max_height (int, optional): Sets the maximum row heigth. Used by __call__ only in the "auto" layout. Defaults to None.
         """
-        self.default_layout = default_layout
-        self.show_context_warning = True
+        self._default_layout = default_layout
+        self._last_call_pos = None
+        self._show_context_warning = True
 
     def __call__(
         self,
@@ -46,43 +53,54 @@ class PrintFunc:
         printed without a label.
 
         Args:
-            layout (Layout, optional): Layout to be used with the self-documenting functionality. Defaults to self.default_layout.
+            layout (Layout, optional): Layout to be used for self-documenting print functionality. Defaults to self.default_layout.
             beg (str, optional): string prepended in front of the output. Defaults to "".
             end (str, optional): string appended after the output. Defaults to "\n".
             sep (str, optional): string inserted between values. Defaults to " ". Ignored if a layout is set.
             file (_type_, optional): a file-like object (stream). Defaults to None.
             flush (bool, optional): whether to forcibly flush the stream. Defaults to False.
         """
+        # set the layout parameter to its default value if no value is given
         if layout == DefaultLayout:
-            layout = self.default_layout
+            layout = self._default_layout
 
         if layout is None:  # do normal built-in print()
             print(*values, end=end, sep=sep, file=file, flush=flush)
             return
 
+        if type(layout) == type:
+            layout = layout()  # create an instance if a class was given
+
         try:
-            call, _ = _get_call_info()
-        except:
+            call, _, pos = _get_call_info()
+        except TypeError:
             # no source code available => do normal built-in print()
-            if self.show_context_warning:
+            if self._show_context_warning:
                 print(_context_warning)
-                self.show_context_warning = False
+                self._show_context_warning = False
             print(*values, end=end, sep=sep, file=file, flush=flush)
             return
 
         arg_exprs = _getargument_expressions(call)
 
-        if len(values) == 1 and _is_literal(
-            arg_exprs[0]
-        ):  # print single literals normally
+        if all(_is_literal(arg_expr) for arg_expr in arg_exprs):
+            # print literals normally
             print(*values, end=end, sep=sep, file=file, flush=flush)
             return
 
-        page = printer.press(arg_exprs, values, layout)
-        print(beg, sep="", end="", file=file)
+        if isinstance(layout, TableLayout) and self._last_call_pos == pos:
+            page = printer.press(arg_exprs, values, layout, beg, end, press_labels=False)
+        else:
+            self._last_call_pos = pos
+            page = printer.press(arg_exprs, values, layout, beg, end)
+
+        # print(beg, sep="", end="", file=file)
         print(
-            page, sep="", end=end, file=file, flush=flush
+            page, sep="", end="", file=file, flush=flush
         )  #  sep is ignored when a layout is used
+
+
+_print = PrintFunc(default_layout=AutoLayout())
 
 
 def print_layout_specs():
@@ -159,6 +177,9 @@ def _get_call_info(context: int = 2) -> (str, dict[str, Any]):
     from where the call to _get_call_info() was issued."""
 
     f_info = inspect.stack()[context]
+    if f_info.code_context is None:
+        raise TypeError()
+
     pos = f_info.positions
     if pos.lineno == pos.end_lineno:
         call = f_info.code_context[0][pos.col_offset : pos.end_col_offset]
@@ -169,7 +190,7 @@ def _get_call_info(context: int = 2) -> (str, dict[str, Any]):
         call[0] = call[0][pos.col_offset :]
         call[-1] = call[-1][: pos.end_col_offset]
         call = "\n".join(call)
-    return call, f_info.frame.f_locals
+    return call, f_info.frame.f_locals, pos
 
 
 def _getargument_expressions(function_call: str) -> list[ast.expr]:
